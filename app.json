@@ -52,11 +52,11 @@
           ]
         },
         {
-          "name": "Truyền hình_DLtivi",
+          "name": "Truyền Hình VTV",
           "versionName": "Mới Nhất",
           "type": "Truyền hình trực tuyến",
-          "logo": "https://raw.githubusercontent.com/movielegend/KhoApp/main/Apps/Truyền hình_DLtivi/logo2.png",
-          "linkDownload": "https://github.com/movielegend/KhoApp/releases/download/KhoApp/DLStore_v10.1.apk",
+          "logo": "https://raw.githubusercontent.com/dinhkhackhanhdz-blip/khanhitstore/main/QUAN TV/vtv.png",
+          "linkDownload": "https://github.com/dinhkhackhanhdz-blip/khanhitstore/releases/download/apk/quantv.apkk",
           "note": "Ứng dụng xem TV miễn phí.",
           "preview": [
             "https://raw.githubusercontent.com/movielegend/KhoApp/main/Apps/Truyền hình_DLtivi/anh2.png"
