@@ -4,14 +4,14 @@
 
 function getManifest() {
     return JSON.stringify({
-        "id": "topxx",
-        "name": "TopXX",
-        "version": "1.0.0",
-        "baseUrl": "https://topxx.vip",
-        "iconUrl": "https://topxx.vip/favicon.ico",
-        "isEnabled": true,
-        "isAdult": true,
-        "type": "MOVIE"
+        id: "topxx",
+        name: "TopXX",
+        version: "1.0.1",
+        baseUrl: "https://topxx.vip",
+        iconUrl: "https://topxx.vip/favicon.ico",
+        isEnabled: true,
+        isAdult: true,
+        type: "MOVIE"
     });
 }
 
@@ -35,9 +35,7 @@ function getPrimaryCategories() {
 
 function getFilterConfig() {
     return JSON.stringify({
-        sort: [
-            { name: 'Mới cập nhật', value: 'latest' }
-        ]
+        sort: [{ name: 'Mới cập nhật', value: 'latest' }]
     });
 }
 
@@ -45,311 +43,285 @@ function getFilterConfig() {
 // HELPERS
 // =============================================================================
 
-function getTransTranslation(item, key) {
-    if (!item || (!item.trans && !item.translations)) return "";
-    var transList = item.trans || item.translations || [];
-    for (var i = 0; i < transList.length; i++) {
-        if (transList[i].locale === 'vi' && transList[i][key]) return transList[i][key];
+function safeJson(str) {
+    try { return JSON.parse(str); } catch (e) { return {}; }
+}
+
+function safeArray(data) {
+    return Array.isArray(data) ? data : [];
+}
+
+function getTrans(item, key) {
+    if (!item) return "";
+    var list = item.trans || item.translations || [];
+    for (var i = 0; i < list.length; i++) {
+        if (list[i].locale === 'vi' && list[i][key]) return list[i][key];
     }
-    for (var i = 0; i < transList.length; i++) {
-        if (transList[i].locale === 'en' && transList[i][key]) return transList[i][key];
+    for (var j = 0; j < list.length; j++) {
+        if (list[j].locale === 'en' && list[j][key]) return list[j][key];
     }
-    if (transList.length > 0 && transList[0][key]) return transList[0][key];
-    return "";
+    return list[0] ? (list[0][key] || "") : "";
+}
+
+function getImage(item) {
+    if (!item) return "";
+    if (item.images && item.images.length) return item.images[0].path;
+    return item.thumbnail || "";
 }
 
 // =============================================================================
-// URL GENERATION
+// URLS
 // =============================================================================
 
 function getUrlList(slug, filtersJson) {
-    try {
-        var filters = JSON.parse(filtersJson || "{}");
-        var page = filters.page || 1;
+    var filters = safeJson(filtersJson);
+    var page = filters.page || 1;
 
-        var baseUrl = "https://topxx.vip/api/v1";
-        var finalPath = "";
+    var base = "https://topxx.vip/api/v1";
+    var path = "";
 
-        if (slug === 'today') {
-            finalPath = "/movies/today";
-        } else if (slug === 'latest') {
-            finalPath = "/movies/latest";
-        } else if (slug === 'actors') {
-            finalPath = "/actors";
-        } else if (['vn', 'cn', 'jp', 'us'].indexOf(slug) !== -1) {
-            finalPath = "/countries/" + slug + "/movies";
-        } else if (slug.indexOf('genre-') === 0) {
-            finalPath = "/genres/" + slug.replace('genre-', '') + "/movies";
-        } else if (slug.indexOf('country-') === 0) {
-            finalPath = "/countries/" + slug.replace('country-', '') + "/movies";
-        } else if (slug.indexOf('actor-') === 0) {
-            return getUrlSearch(slug.replace('actor-', ''), filtersJson);
-        } else {
-            finalPath = "/genres/" + slug + "/movies";
-        }
+    if (slug === 'today') path = "/movies/today";
+    else if (slug === 'latest') path = "/movies/latest";
+    else if (slug === 'actors') path = "/actors";
+    else if (['vn', 'cn', 'jp', 'us'].indexOf(slug) !== -1)
+        path = "/countries/" + slug + "/movies";
+    else if (slug.indexOf("genre-") === 0)
+        path = "/genres/" + slug.replace("genre-", "") + "/movies";
+    else if (slug.indexOf("country-") === 0)
+        path = "/countries/" + slug.replace("country-", "") + "/movies";
+    else
+        path = "/genres/" + slug + "/movies";
 
-        var url = baseUrl + finalPath + "?page=" + page;
-        return url;
-    } catch (e) {
-        return "https://topxx.vip/api/v1/movies/latest";
-    }
+    return base + path + "?page=" + page;
 }
 
 function getUrlSearch(keyword, filtersJson) {
-    var filters = JSON.parse(filtersJson || "{}");
+    var filters = safeJson(filtersJson);
     var page = filters.page || 1;
-    // Tạm thời fallback gọi movies list theo keyword nếu có API search
-    return "https://topxx.vip/api/v1/movies/latest?q=" + encodeURIComponent(keyword) + "&page=" + page;
+
+    if (!keyword) {
+        return "https://topxx.vip/api/v1/movies/latest?page=" + page;
+    }
+
+    return "https://topxx.vip/api/v1/movies/latest?q=" +
+        encodeURIComponent(keyword) + "&page=" + page;
 }
 
 function getUrlDetail(slug) {
     return "https://topxx.vip/api/v1/movies/" + slug;
 }
 
-function getUrlCategories() { return "https://topxx.vip/api/v1/genres"; }
-function getUrlCountries() { return "https://topxx.vip/api/v1/countries"; }
-// function getUrlYears() { return ""; }
+function getUrlCategories() {
+    return "https://topxx.vip/api/v1/genres";
+}
+
+function getUrlCountries() {
+    return "https://topxx.vip/api/v1/countries";
+}
 
 // =============================================================================
-// PARSERS
+// LIST PARSER
 // =============================================================================
 
-function parseListResponse(apiResponseJson) {
+function parseListResponse(json) {
     try {
-        var response = JSON.parse(apiResponseJson);
-        var items = response.data || [];
+        var res = safeJson(json);
 
-        // Handle variations in response format just in case
-        if (response.data && response.data.items) {
-            items = response.data.items;
-        } else if (response.data && response.data.data) {
-            items = response.data.data;
-        } else if (Array.isArray(response.data)) {
-            items = response.data;
-        } else if (Array.isArray(response)) {
-            items = response;
-        }
+        var items =
+            (res.data && res.data.items) ||
+            (res.data && res.data.data) ||
+            res.data ||
+            res ||
+            [];
 
-        var movies = items.map(function (item) {
-            var isActorItem = item.hasOwnProperty('gender') || item.hasOwnProperty('avatar');
+        items = safeArray(items);
 
-            if (isActorItem) {
-                var name = getTransTranslation(item, 'name');
-                var code = item.code || getTransTranslation(item, 'slug');
-                if (!code && item.avatar) {
-                    var match = item.avatar.match(/actors\/([^\/]+)-avatar/);
-                    if (match) code = match[1];
-                }
-                if (!code) code = (name || "").toLowerCase().replace(/\s+/g, '-');
+        var movies = [];
 
-                return {
+        for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+
+            var isActor = item.gender || item.avatar;
+
+            if (isActor) {
+                var name = getTrans(item, 'name') || item.name || "";
+                var code = item.code || name.toLowerCase().replace(/\s+/g, '-');
+
+                movies.push({
                     id: "actor-" + code,
                     title: name || code,
                     posterUrl: item.avatar || "",
                     backdropUrl: item.avatar || "",
                     year: 0,
-                    quality: "ACTRESS",
+                    quality: "ACTOR",
                     episode_current: "",
                     lang: ""
-                };
-            }
+                });
 
-            var backdrop = "";
-            if (item.images && item.images.length > 0) {
-                backdrop = item.images[0].path;
             } else {
-                backdrop = item.thumbnail || "";
+                movies.push({
+                    id: item.code,
+                    title: getTrans(item, 'title') || item.code,
+                    posterUrl: item.thumbnail || "",
+                    backdropUrl: getImage(item),
+                    year: item.publish_at ? parseInt(item.publish_at.substring(0, 4)) : 0,
+                    quality: item.quality || "",
+                    episode_current: item.duration || "",
+                    lang: ""
+                });
             }
-
-            return {
-                id: item.code,
-                title: getTransTranslation(item, 'title') || item.code,
-                posterUrl: item.thumbnail || "",
-                backdropUrl: backdrop,
-                year: item.publish_at ? parseInt(item.publish_at.substring(0, 4)) : 0,
-                quality: item.quality || "",
-                episode_current: item.duration || "",
-                lang: ""
-            };
-        });
-
-        var currentPage = 1;
-        var totalPages = 1;
-
-        if (response.meta) {
-            currentPage = response.meta.current_page || 1;
-            totalPages = response.meta.last_page || 1;
         }
+
+        var meta = res.meta || {};
 
         return JSON.stringify({
             items: movies,
             pagination: {
-                currentPage: currentPage,
-                totalPages: totalPages,
-                totalItems: movies.length,
+                currentPage: meta.current_page || 1,
+                totalPages: meta.last_page || 1,
+                totalItems: meta.total || movies.length,
                 itemsPerPage: movies.length
             }
         });
-    } catch (error) {
-        return JSON.stringify({ items: [], pagination: { currentPage: 1, totalPages: 1 } });
+
+    } catch (e) {
+        return JSON.stringify({
+            items: [],
+            pagination: { currentPage: 1, totalPages: 1 }
+        });
     }
 }
 
-function parseSearchResponse(apiResponseJson) {
-    return parseListResponse(apiResponseJson);
+function parseSearchResponse(json) {
+    return parseListResponse(json);
 }
 
-function parseMovieDetail(apiResponseJson) {
+// =============================================================================
+// DETAIL
+// =============================================================================
+
+function parseMovieDetail(json) {
     try {
-        var response = JSON.parse(apiResponseJson);
-        var movie = response.data || {};
+        var res = safeJson(json);
+        var m = res.data || {};
 
-        var title = getTransTranslation(movie, 'title') || movie.code;
-        var desc = getTransTranslation(movie, 'content') || getTransTranslation(movie, 'description') || "";
-
-        var backdrop = "";
-        if (movie.images && movie.images.length > 0) {
-            backdrop = movie.images[0].path;
-        } else {
-            backdrop = movie.thumbnail || "";
-        }
-
-        var categoryList = [];
-        if (movie.genres) {
-            movie.genres.forEach(function (g) {
-                var name = getTransTranslation(g, 'name');
-                if (name) categoryList.push("[" + name + "](genre-" + g.code + ")");
-            });
-        }
-        var categories = categoryList.join(', ');
-
-        var countryList = [];
-        if (movie.countries) {
-            movie.countries.forEach(function (c) {
-                var name = getTransTranslation(c, 'name');
-                if (name) countryList.push("[" + name + "](country-" + c.code + ")");
-            });
-        }
-        var countries = countryList.join(', ');
-
-        var castList = [];
-        if (movie.actors) {
-            movie.actors.forEach(function (a) {
-                var name = getTransTranslation(a, 'name');
-                if (name) {
-                    var code = a.code || getTransTranslation(a, 'slug');
-                    if (!code && a.avatar) {
-                        var match = a.avatar.match(/actors\/([^\/]+)-avatar/);
-                        if (match) code = match[1];
-                    }
-                    if (!code) code = name.toLowerCase().replace(/\s+/g, '-');
-                    castList.push("[" + name + "](actor-" + code + ")");
-                }
-            });
-        }
-        var casts = castList.join(', ');
+        var title = getTrans(m, 'title') || m.code;
+        var desc = getTrans(m, 'content') || getTrans(m, 'description') || "";
 
         var servers = [];
-        if (movie.sources && movie.sources.length > 0) {
-            var episodes = [];
-            movie.sources.forEach(function (src, index) {
+
+        if (m.sources && m.sources.length) {
+            var eps = [];
+
+            for (var i = 0; i < m.sources.length; i++) {
+                var src = m.sources[i];
                 var link = src.link;
-                // Convert embed to m3u8
-                if (src.type === 'embed' && link && link.indexOf('/player/') > -1) {
-                    var id = link.split('/player/')[1];
-                    link = "https://embed.streamxx.net/stream/" + id + "/main.m3u8";
+
+                if (src.type === "embed" && link) {
+                    var match = link.match(/\/player\/([^\/]+)/);
+                    if (match) {
+                        link = "https://embed.streamxx.net/stream/" + match[1] + "/main.m3u8";
+                    }
                 }
 
-                episodes.push({
+                eps.push({
                     id: link,
-                    name: "Server " + (index + 1),
-                    slug: "ep-" + (index + 1)
+                    name: "Server " + (i + 1),
+                    slug: "ep-" + (i + 1)
                 });
-            });
-
-            if (episodes.length > 0) {
-                servers.push({ name: "VIP", episodes: episodes });
             }
+
+            servers.push({ name: "VIP", episodes: eps });
         }
 
         return JSON.stringify({
-            id: movie.code,
+            id: m.code,
             title: title,
             originName: title,
-            posterUrl: movie.thumbnail || "",
-            backdropUrl: backdrop,
+            posterUrl: m.thumbnail || "",
+            backdropUrl: getImage(m),
             description: desc,
-            year: movie.publish_at ? parseInt(movie.publish_at.substring(0, 4)) : 0,
+            year: m.publish_at ? parseInt(m.publish_at.substring(0, 4)) : 0,
             rating: 0,
-            quality: movie.quality || "",
+            quality: m.quality || "",
             servers: servers,
-            episode_current: movie.duration || "",
+            episode_current: m.duration || "",
             lang: "",
-            category: categories,
-            country: countries,
-            director: "",
-            casts: casts,
-            tmdbId: "",
-            tmdbSeason: 0,
-            tmdbType: ""
+            category: "",
+            country: "",
+            casts: ""
         });
-    } catch (error) { return "null"; }
+
+    } catch (e) {
+        return "null";
+    }
 }
 
-function parseDetailResponse(apiResponseJson) {
-    try {
-        var streamUrl = "";
+// =============================================================================
+// STREAM
+// =============================================================================
 
-        // Nếu input là direct URL m3u8 thay vì json
-        if (apiResponseJson.indexOf("http") === 0) {
-            streamUrl = apiResponseJson;
+function parseDetailResponse(input) {
+    try {
+        var url = "";
+
+        if (typeof input === "string" && input.indexOf("http") === 0) {
+            url = input;
         } else {
-            var response = JSON.parse(apiResponseJson);
-            if (response.data && response.data.sources && response.data.sources.length > 0) {
-                var src = response.data.sources[0];
-                var link = src.link;
-                if (src.type === 'embed' && link && link.indexOf('/player/') > -1) {
-                    var id = link.split('/player/')[1];
-                    streamUrl = "https://embed.streamxx.net/stream/" + id + "/main.m3u8";
-                } else {
-                    streamUrl = link;
-                }
+            var res = safeJson(input);
+
+            if (res.data && res.data.sources && res.data.sources.length) {
+                var s = res.data.sources[0];
+                url = s.link || "";
             }
         }
 
         return JSON.stringify({
-            url: streamUrl,
+            url: url,
             headers: {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "User-Agent": "Mozilla/5.0",
                 "Referer": "https://embed.streamxx.net/"
             },
             subtitles: []
         });
-    } catch (error) {
-        // Fallback return input if parsing string failed
-        return JSON.stringify({
-            url: apiResponseJson,
-            headers: {}
-        });
+
+    } catch (e) {
+        return JSON.stringify({ url: input, headers: {} });
     }
 }
 
-function parseCategoriesResponse(apiResponseJson) {
+// =============================================================================
+// CATEGORIES / COUNTRIES
+// =============================================================================
+
+function parseCategoriesResponse(json) {
     try {
-        var response = JSON.parse(apiResponseJson);
-        var items = response.data || [];
+        var res = safeJson(json);
+        var items = safeArray(res.data);
+
         return JSON.stringify(items.map(function (i) {
-            return { name: getTransTranslation(i, 'name') || i.code, slug: "genre-" + i.code };
+            return {
+                name: getTrans(i, 'name') || i.code,
+                slug: "genre-" + i.code
+            };
         }));
-    } catch (e) { return "[]"; }
+    } catch (e) {
+        return "[]";
+    }
 }
 
-function parseCountriesResponse(apiResponseJson) {
+function parseCountriesResponse(json) {
     try {
-        var response = JSON.parse(apiResponseJson);
-        var items = response.data || [];
+        var res = safeJson(json);
+        var items = safeArray(res.data);
+
         return JSON.stringify(items.map(function (i) {
-            return { name: getTransTranslation(i, 'name') || i.code, value: "country-" + i.code };
+            return {
+                name: getTrans(i, 'name') || i.code,
+                value: "country-" + i.code
+            };
         }));
-    } catch (e) { return "[]"; }
+    } catch (e) {
+        return "[]";
+    }
 }
